@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinearPro — Team Analytics for Linear & JIRA</title>
+    <meta name="description" content="Connect Linear or JIRA in seconds. Get instant team analytics, workload visibility, standup briefs, and stale-ticket alerts — all in one beautiful dashboard.">
+    <meta property="og:title" content="LinearPro — Team Analytics for Linear & JIRA">
+    <meta property="og:description" content="Your team's work, visualized. Instant analytics, standup briefs, and stale-ticket alerts.">
+    <meta property="og:type" content="website">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #5E6AD2;
+            --primary-light: #7B84E0;
+            --primary-dark: #4850B8;
+            --primary-glow: rgba(94, 106, 210, 0.4);
+            --primary-subtle: rgba(94, 106, 210, 0.08);
+            --bg-dark: #0a0c10;
+            --bg-card: #12161e;
+            --bg-card-hover: #181d28;
+            --bg-surface: #1a1f2b;
+            --bg-elevated: #1e2430;
+            --text-primary: #e8ecf4;
+            --text-secondary: #8b949e;
+            --text-muted: #5a6270;
+            --border: rgba(255,255,255,0.06);
+            --border-light: rgba(255,255,255,0.1);
+            --green: #34d399;
+            --yellow: #fbbf24;
+            --orange: #f97316;
+            --red: #f87171;
+            --blue: #60a5fa;
+            --purple: #a78bfa;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --radius-xs: 6px;
+            --shadow: 0 4px 24px rgba(0,0,0,0.25);
+            --shadow-lg: 0 20px 60px rgba(0,0,0,0.5);
+            --shadow-glow: 0 0 40px rgba(94,106,210,0.12);
+            --transition: 0.25s cubic-bezier(0.4,0,0.2,1);
+            --transition-slow: 0.45s cubic-bezier(0.16,1,0.3,1);
+        }
+
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* ===== Particles ===== */
+        #particles-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* ===== Nav ===== */
+        .nav {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 100;
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: var(--transition);
+            background: transparent;
+        }
+
+        .nav.scrolled {
+            background: rgba(10, 12, 16, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 2rem;
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            text-decoration: none;
+            color: var(--text-primary);
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .nav-brand-icon {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+            color: white;
+        }
+
+        .nav-brand span { color: var(--primary-light); }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.88rem;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .nav-links a:hover { color: var(--text-primary); }
+
+        .nav-cta {
+            background: var(--primary);
+            color: white !important;
+            padding: 0.55rem 1.3rem;
+            border-radius: var(--radius-xs);
+            font-weight: 600 !important;
+            transition: var(--transition);
+        }
+
+        .nav-cta:hover {
+            background: var(--primary-light) !important;
+            box-shadow: 0 4px 20px var(--primary-glow);
+        }
+
+        .hamburger {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.4rem;
+            cursor: pointer;
+        }
+
+        /* ===== Hero ===== */
+        .hero {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 8rem 2rem 4rem;
+        }
+
+        .hero-content { max-width: 780px; }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--primary-subtle);
+            border: 1px solid rgba(94,106,210,0.2);
+            color: var(--primary-light);
+            padding: 0.4rem 1rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-bottom: 1.75rem;
+        }
+
+        .hero-badge i { font-size: 0.7rem; }
+
+        .hero h1 {
+            font-size: 3.8rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+        }
+
+        .hero h1 .gradient-text {
+            background: linear-gradient(135deg, var(--primary-light), var(--blue), var(--purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.18rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 2.5rem;
+            line-height: 1.7;
+        }
+
+        .hero-btns {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            padding: 0.85rem 2rem;
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: var(--transition);
+            box-shadow: 0 4px 24px var(--primary-glow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px var(--primary-glow);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            padding: 0.85rem 2rem;
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            font-weight: 500;
+            border: 1px solid var(--border-light);
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: var(--transition);
+        }
+
+        .btn-ghost:hover {
+            border-color: var(--primary);
+            color: var(--text-primary);
+            background: var(--primary-subtle);
+        }
+
+        /* ===== Dashboard Mockup ===== */
+        .hero-mockup {
+            margin-top: 4rem;
+            position: relative;
+        }
+
+        .mockup-window {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow-lg), var(--shadow-glow);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .mockup-titlebar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0.75rem 1rem;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .mockup-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+        }
+
+        .mockup-body {
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .mockup-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .mockup-nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+
+        .mockup-nav-logo i {
+            color: var(--primary);
+            font-size: 0.75rem;
+        }
+
+        .mockup-nav-logo span { color: var(--primary-light); }
+
+        .mockup-nav-right {
+            display: flex;
+            gap: 0.4rem;
+        }
+
+        .mockup-nav-btn {
+            width: 24px; height: 24px;
+            background: var(--bg-elevated);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mockup-nav-btn i { font-size: 0.55rem; color: var(--text-muted); }
+
+        .mockup-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.6rem;
+        }
+
+        .mockup-stat {
+            background: var(--bg-surface);
+            border-radius: 8px;
+            padding: 0.7rem;
+            border: 1px solid var(--border);
+        }
+
+        .mockup-stat-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .mockup-stat-label {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            margin-top: 0.15rem;
+        }
+
+        .mockup-charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.6rem;
+        }
+
+        .mockup-chart {
+            background: var(--bg-surface);
+            border-radius: 8px;
+            padding: 0.8rem;
+            border: 1px solid var(--border);
+            height: 90px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .mockup-chart-title {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .mockup-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 50px;
+        }
+
+        .mockup-bar {
+            flex: 1;
+            border-radius: 3px 3px 0 0;
+            min-height: 6px;
+        }
+
+        .mockup-donut {
+            width: 50px; height: 50px;
+            border-radius: 50%;
+            border: 6px solid var(--primary);
+            border-right-color: var(--green);
+            border-bottom-color: var(--yellow);
+            margin: 0 auto;
+        }
+
+        .mockup-glow {
+            position: absolute;
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: -1;
+            border-radius: 50%;
+        }
+
+        /* ===== Integrations Strip ===== */
+        .integrations {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 4rem 2rem;
+        }
+
+        .integrations p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+        }
+
+        .integration-cards {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .integration-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            padding: 1.25rem 2.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            transition: var(--transition);
+        }
+
+        .integration-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .integration-card i {
+            font-size: 1.6rem;
+            color: var(--primary-light);
+        }
+
+        .integration-card span {
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+
+        /* ===== Section shared ===== */
+        .section {
+            position: relative;
+            z-index: 1;
+            padding: 6rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            color: var(--primary-light);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            margin-bottom: 0.75rem;
+        }
+
+        .section-title {
+            font-size: 2.4rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 1rem;
+        }
+
+        .section-subtitle {
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+            max-width: 600px;
+            margin-bottom: 3.5rem;
+        }
+
+        /* ===== Features Grid ===== */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            transition: var(--transition);
+        }
+
+        .feature-card:hover {
+            border-color: var(--border-light);
+            background: var(--bg-card-hover);
+            transform: translateY(-4px);
+            box-shadow: var(--shadow), var(--shadow-glow);
+        }
+
+        .feature-icon {
+            width: 48px; height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.6rem;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            line-height: 1.6;
+        }
+
+        /* ===== How It Works ===== */
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            position: relative;
+        }
+
+        .steps::before {
+            content: '';
+            position: absolute;
+            top: 32px;
+            left: calc(16.66% + 24px);
+            right: calc(16.66% + 24px);
+            height: 2px;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light), var(--primary));
+            opacity: 0.3;
+        }
+
+        .step {
+            text-align: center;
+        }
+
+        .step-number {
+            width: 64px; height: 64px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: white;
+            margin: 0 auto 1.25rem;
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 4px 20px var(--primary-glow);
+        }
+
+        .step h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .step p {
+            color: var(--text-secondary);
+            font-size: 0.88rem;
+            line-height: 1.6;
+        }
+
+        /* ===== Highlight Band ===== */
+        .highlight {
+            position: relative;
+            z-index: 1;
+            padding: 5rem 2rem;
+            background: linear-gradient(180deg, transparent, rgba(94,106,210,0.05) 30%, rgba(94,106,210,0.05) 70%, transparent);
+        }
+
+        .highlight-inner {
+            max-width: 900px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            align-items: center;
+        }
+
+        .highlight-text h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 1rem;
+        }
+
+        .highlight-text p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            line-height: 1.7;
+            margin-bottom: 1.5rem;
+        }
+
+        .highlight-features {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .highlight-features li {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .highlight-features li i {
+            color: var(--green);
+            font-size: 0.8rem;
+            flex-shrink: 0;
+        }
+
+        .highlight-terminal {
+            background: var(--bg-card);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .terminal-titlebar {
+            background: var(--bg-surface);
+            padding: 0.65rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .terminal-body {
+            padding: 1.25rem;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 0.78rem;
+            line-height: 1.8;
+            color: var(--text-secondary);
+        }
+
+        .terminal-body .t-comment { color: var(--text-muted); }
+        .terminal-body .t-keyword { color: var(--purple); }
+        .terminal-body .t-string { color: var(--green); }
+        .terminal-body .t-fn { color: var(--blue); }
+        .terminal-body .t-primary { color: var(--primary-light); }
+
+        /* ===== CTA ===== */
+        .cta {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 7rem 2rem 5rem;
+        }
+
+        .cta h2 {
+            font-size: 2.6rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 1rem;
+        }
+
+        .cta p {
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .cta-providers {
+            margin-top: 1.25rem;
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .cta-providers span {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        /* ===== Footer ===== */
+        .footer {
+            position: relative;
+            z-index: 1;
+            padding: 2rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .footer-brand i { color: var(--primary); }
+
+        .footer-links {
+            display: flex;
+            gap: 1.5rem;
+            list-style: none;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.82rem;
+            transition: var(--transition);
+        }
+
+        .footer-links a:hover { color: var(--text-secondary); }
+
+        /* ===== Scroll Reveal ===== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.7s var(--transition-slow), transform 0.7s var(--transition-slow);
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 1024px) {
+            .features-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .nav-links.open {
+                display: flex;
+                flex-direction: column;
+                position: absolute;
+                top: 100%;
+                left: 0; right: 0;
+                background: rgba(10,12,16,0.95);
+                backdrop-filter: blur(20px);
+                padding: 1.5rem 2rem;
+                border-bottom: 1px solid var(--border);
+                gap: 1rem;
+            }
+            .hamburger { display: block; }
+            .hero h1 { font-size: 2.4rem; }
+            .hero p { font-size: 1rem; }
+            .features-grid { grid-template-columns: 1fr; }
+            .steps { grid-template-columns: 1fr; gap: 2.5rem; }
+            .steps::before { display: none; }
+            .mockup-stats { grid-template-columns: repeat(2, 1fr); }
+            .mockup-charts { grid-template-columns: 1fr; }
+            .highlight-inner { grid-template-columns: 1fr; }
+            .section-title { font-size: 1.8rem; }
+            .cta h2 { font-size: 1.9rem; }
+            .footer { flex-direction: column; gap: 1rem; text-align: center; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+            #particles-canvas { display: none; }
+            .reveal { opacity: 1; transform: none; }
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="particles-canvas"></canvas>
+
+<!-- ===== Nav ===== -->
+<nav class="nav" id="navbar">
+    <a class="nav-brand" href="#">
+        <div class="nav-brand-icon"><i class="fas fa-chart-line"></i></div>
+        Linear<span>Pro</span>
+    </a>
+    <ul class="nav-links" id="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how-it-works">How It Works</a></li>
+        <li><a href="#integrations">Integrations</a></li>
+        <li><a href="index.html" class="nav-cta">Launch App <i class="fas fa-arrow-right" style="font-size:0.75rem"></i></a></li>
+    </ul>
+    <button class="hamburger" id="hamburger"><i class="fas fa-bars"></i></button>
+</nav>
+
+<!-- ===== Hero ===== -->
+<section class="hero">
+    <div class="hero-content">
+        <div class="hero-badge">
+            <i class="fas fa-bolt"></i> Now with JIRA Cloud support
+        </div>
+        <h1>Your team's work,<br><span class="gradient-text">visualized.</span></h1>
+        <p>Connect Linear or JIRA in seconds. Get instant analytics, workload visibility, standup briefs, and stale-ticket alerts &mdash; all in one beautiful dashboard.</p>
+        <div class="hero-btns">
+            <a href="index.html" class="btn-primary"><i class="fas fa-rocket"></i> Launch Dashboard</a>
+            <a href="#features" class="btn-ghost"><i class="fas fa-sparkles"></i> See Features</a>
+        </div>
+
+        <!-- Dashboard Mockup -->
+        <div class="hero-mockup reveal">
+            <div class="mockup-glow"></div>
+            <div class="mockup-window">
+                <div class="mockup-titlebar">
+                    <div class="mockup-dot" style="background:#f87171"></div>
+                    <div class="mockup-dot" style="background:#fbbf24"></div>
+                    <div class="mockup-dot" style="background:#34d399"></div>
+                </div>
+                <div class="mockup-body">
+                    <div class="mockup-nav">
+                        <div class="mockup-nav-logo">
+                            <i class="fas fa-chart-line"></i> Linear<span>Pro</span>
+                        </div>
+                        <div class="mockup-nav-right">
+                            <div class="mockup-nav-btn"><i class="fas fa-clipboard-list"></i></div>
+                            <div class="mockup-nav-btn"><i class="fas fa-triangle-exclamation"></i></div>
+                            <div class="mockup-nav-btn"><i class="fas fa-sync-alt"></i></div>
+                        </div>
+                    </div>
+                    <div class="mockup-stats">
+                        <div class="mockup-stat">
+                            <div class="mockup-stat-value" style="color:var(--primary-light)">12</div>
+                            <div class="mockup-stat-label">Members</div>
+                        </div>
+                        <div class="mockup-stat">
+                            <div class="mockup-stat-value">248</div>
+                            <div class="mockup-stat-label">Issues</div>
+                        </div>
+                        <div class="mockup-stat">
+                            <div class="mockup-stat-value" style="color:var(--green)">143</div>
+                            <div class="mockup-stat-label">Completed</div>
+                        </div>
+                        <div class="mockup-stat">
+                            <div class="mockup-stat-value" style="color:var(--yellow)">37</div>
+                            <div class="mockup-stat-label">In Progress</div>
+                        </div>
+                    </div>
+                    <div class="mockup-charts">
+                        <div class="mockup-chart">
+                            <div class="mockup-chart-title">Issue Status</div>
+                            <div class="mockup-donut"></div>
+                        </div>
+                        <div class="mockup-chart">
+                            <div class="mockup-chart-title">Workload</div>
+                            <div class="mockup-bars">
+                                <div class="mockup-bar" style="height:80%;background:var(--primary)"></div>
+                                <div class="mockup-bar" style="height:65%;background:var(--primary)"></div>
+                                <div class="mockup-bar" style="height:90%;background:var(--red)"></div>
+                                <div class="mockup-bar" style="height:45%;background:var(--primary)"></div>
+                                <div class="mockup-bar" style="height:70%;background:var(--yellow)"></div>
+                                <div class="mockup-bar" style="height:55%;background:var(--primary)"></div>
+                                <div class="mockup-bar" style="height:35%;background:var(--primary)"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Integrations ===== -->
+<section class="integrations" id="integrations">
+    <p>Works with your favorite tools</p>
+    <div class="integration-cards">
+        <div class="integration-card reveal">
+            <i class="fas fa-chart-line"></i>
+            <span>Linear</span>
+        </div>
+        <div class="integration-card reveal">
+            <i class="fab fa-jira"></i>
+            <span>JIRA Cloud</span>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Features ===== -->
+<section class="section" id="features">
+    <div class="section-label reveal"><i class="fas fa-sparkles"></i> Features</div>
+    <h2 class="section-title reveal">Everything you need to understand your team's velocity</h2>
+    <p class="section-subtitle reveal">A single dashboard that turns your issue tracker data into actionable insights.</p>
+
+    <div class="features-grid">
+        <div class="feature-card reveal">
+            <div class="feature-icon" style="background:rgba(94,106,210,0.12);color:var(--primary-light)">
+                <i class="fas fa-users"></i>
+            </div>
+            <h3>Team Overview</h3>
+            <p>See every team member's workload at a glance. Cards show issue counts, status breakdowns, and completion rates with animated visuals.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon" style="background:rgba(96,165,250,0.12);color:var(--blue)">
+                <i class="fas fa-chart-pie"></i>
+            </div>
+            <h3>Rich Analytics</h3>
+            <p>Four interactive charts: status distribution, workload comparison, priority breakdown, and team-level issue analysis.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon" style="background:rgba(167,139,250,0.12);color:var(--purple)">
+                <i class="fas fa-user-circle"></i>
+            </div>
+            <h3>Member Deep-Dive</h3>
+            <p>Click any member for a detailed modal with time-filtered views &mdash; today, 3 days, 7 days, 15 days &mdash; and their full issue table.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon" style="background:rgba(52,211,153,0.12);color:var(--green)">
+                <i class="fas fa-ticket"></i>
+            </div>
+            <h3>Ticket Detail Panel</h3>
+            <p>Slide-out panel showing description, comments, activity timeline, sub-issues, labels, and full metadata for any ticket.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon" style="background:rgba(248,113,113,0.12);color:var(--red)">
+                <i class="fas fa-triangle-exclamation"></i>
+            </div>
+            <h3>SOS Alerts</h3>
+            <p>Automatically flags high-priority tickets stale for 2&ndash;7 days with no comments or status changes. Never miss a dropped ball.</p>
+        </div>
+        <div class="feature-card reveal">
+            <div class="feature-icon" style="background:rgba(251,191,36,0.12);color:var(--yellow)">
+                <i class="fas fa-clipboard-list"></i>
+            </div>
+            <h3>Standup Brief</h3>
+            <p>One-click daily standup summary: blockers, at-risk items, unassigned tickets, workload imbalances, and recent completions.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ===== How It Works ===== -->
+<section class="section" id="how-it-works">
+    <div class="section-label reveal"><i class="fas fa-route"></i> How It Works</div>
+    <h2 class="section-title reveal">Up and running in 30 seconds</h2>
+    <p class="section-subtitle reveal">No signup. No server. No tracking. Just connect and go.</p>
+
+    <div class="steps">
+        <div class="step reveal">
+            <div class="step-number">1</div>
+            <h3>Choose your provider</h3>
+            <p>Toggle between Linear and JIRA Cloud on the login screen. One dashboard, two data sources.</p>
+        </div>
+        <div class="step reveal">
+            <div class="step-number">2</div>
+            <h3>Enter your API key</h3>
+            <p>Paste your Linear API key or JIRA credentials. Your data stays in your browser &mdash; nothing leaves your machine.</p>
+        </div>
+        <div class="step reveal">
+            <div class="step-number">3</div>
+            <h3>Get instant insights</h3>
+            <p>Dashboard loads with team data, analytics charts, SOS alerts, and standup briefs &mdash; ready for your next meeting.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ===== Highlight ===== -->
+<section class="highlight">
+    <div class="highlight-inner">
+        <div class="highlight-text reveal">
+            <h2>Built for privacy.<br>Runs in your browser.</h2>
+            <p>LinearPro has zero backend. Your API keys are stored locally in your browser. No accounts, no servers, no data collection &mdash; just a static page that talks directly to Linear and JIRA APIs.</p>
+            <ul class="highlight-features">
+                <li><i class="fas fa-check"></i> Zero backend &mdash; runs entirely client-side</li>
+                <li><i class="fas fa-check"></i> Credentials stored in localStorage only</li>
+                <li><i class="fas fa-check"></i> Direct API calls &mdash; no middleman</li>
+                <li><i class="fas fa-check"></i> Open source &mdash; read every line of code</li>
+                <li><i class="fas fa-check"></i> Beautiful dark UI with smooth animations</li>
+            </ul>
+        </div>
+        <div class="highlight-terminal reveal">
+            <div class="terminal-titlebar">
+                <div class="mockup-dot" style="background:#f87171"></div>
+                <div class="mockup-dot" style="background:#fbbf24"></div>
+                <div class="mockup-dot" style="background:#34d399"></div>
+            </div>
+            <div class="terminal-body">
+                <span class="t-comment">// Provider architecture</span><br><br>
+                <span class="t-primary">UI</span> / Dashboard / Panels / Charts<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+                &nbsp;&nbsp;&nbsp;<span class="t-fn">api</span> <span class="t-comment">(dispatcher)</span><br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;┌──┴──┐<br>
+                <span class="t-keyword">linearApi</span>&nbsp;&nbsp;<span class="t-keyword">jiraApi</span><br><br>
+                <span class="t-comment">// One interface, two providers</span><br>
+                <span class="t-fn">api</span>.<span class="t-string">getIssues</span>()<br>
+                <span class="t-fn">api</span>.<span class="t-string">getUsers</span>()<br>
+                <span class="t-fn">api</span>.<span class="t-string">getTeams</span>()<br>
+                <span class="t-fn">api</span>.<span class="t-string">getIssueDetail</span>(<span class="t-keyword">id</span>)
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== CTA ===== -->
+<section class="cta">
+    <h2 class="reveal">Ready to see your team's analytics?</h2>
+    <p class="reveal">No signup. No server. Just open and connect.</p>
+    <a href="index.html" class="btn-primary reveal" style="font-size:1.1rem;padding:1rem 2.5rem">
+        <i class="fas fa-rocket"></i> Open LinearPro
+    </a>
+    <div class="cta-providers reveal">
+        <span><i class="fas fa-chart-line" style="color:var(--primary-light)"></i> Linear</span>
+        <span><i class="fab fa-jira" style="color:var(--blue)"></i> JIRA Cloud</span>
+    </div>
+</section>
+
+<!-- ===== Footer ===== -->
+<footer class="footer">
+    <div class="footer-brand">
+        <i class="fas fa-chart-line"></i> LinearPro &copy; 2026
+    </div>
+    <ul class="footer-links">
+        <li><a href="index.html">Launch App</a></li>
+        <li><a href="#features">Features</a></li>
+    </ul>
+</footer>
+
+<script>
+// Particles
+(function() {
+    const canvas = document.getElementById('particles-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    const COUNT = 60;
+    const DIST = 140;
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    class P {
+        constructor() {
+            this.x = Math.random() * canvas.width;
+            this.y = Math.random() * canvas.height;
+            this.vx = (Math.random() - 0.5) * 0.4;
+            this.vy = (Math.random() - 0.5) * 0.4;
+            this.r = Math.random() * 1.5 + 0.5;
+            this.o = Math.random() * 0.4 + 0.1;
+        }
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+            if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(94,106,210,${this.o})`;
+            ctx.fill();
+        }
+    }
+
+    for (let i = 0; i < COUNT; i++) particles.push(new P());
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => { p.update(); p.draw(); });
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const d = Math.sqrt(dx * dx + dy * dy);
+                if (d < DIST) {
+                    ctx.beginPath();
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.strokeStyle = `rgba(94,106,210,${(1 - d / DIST) * 0.12})`;
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                }
+            }
+        }
+        requestAnimationFrame(animate);
+    }
+    animate();
+})();
+
+// Navbar scroll
+window.addEventListener('scroll', () => {
+    document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 50);
+});
+
+// Hamburger
+document.getElementById('hamburger').addEventListener('click', () => {
+    document.getElementById('nav-links').classList.toggle('open');
+});
+
+// Close mobile nav on link click
+document.querySelectorAll('.nav-links a').forEach(a => {
+    a.addEventListener('click', () => {
+        document.getElementById('nav-links').classList.remove('open');
+    });
+});
+
+// Scroll reveal
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+        if (e.isIntersecting) {
+            e.target.classList.add('visible');
+        }
+    });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
