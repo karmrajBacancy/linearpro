@@ -50,6 +50,8 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+.hidden { display: none !important; }
+
 /* ========== PARTICLES CANVAS ========== */
 #particles-canvas {
     position: fixed;
@@ -132,6 +134,83 @@ body {
     font-size: 0.85rem;
     margin-top: 0.35rem;
     letter-spacing: 0.02em;
+}
+
+/* Provider Toggle */
+.provider-toggle {
+    display: flex;
+    background: var(--bg-surface);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+    margin-bottom: 1.75rem;
+    border: 1px solid var(--border);
+}
+
+.provider-tab {
+    flex: 1;
+    padding: 0.6rem 1rem;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: var(--radius-xs);
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+}
+
+.provider-tab:hover {
+    color: var(--text-primary);
+}
+
+.provider-tab.active {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 2px 8px rgba(94, 106, 210, 0.3);
+}
+
+.provider-tab i {
+    font-size: 0.9rem;
+}
+
+/* Proxy Details (Advanced) */
+.proxy-details {
+    margin-bottom: 1.25rem;
+}
+
+.proxy-details summary {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    cursor: pointer;
+    padding: 0.4rem 0;
+    transition: var(--transition);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.proxy-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.proxy-details summary::before {
+    content: '▸';
+    font-size: 0.7rem;
+    transition: transform 0.2s;
+}
+
+.proxy-details[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.proxy-details summary:hover {
+    color: var(--text-secondary);
 }
 
 /* Form Elements */

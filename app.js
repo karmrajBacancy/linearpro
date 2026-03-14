@@ -3,7 +3,13 @@
 const LinearPro = {
     // State
     state: {
+        provider: 'linear', // 'linear' or 'jira'
         apiKey: null,
+        // JIRA credentials
+        jiraDomain: null,
+        jiraEmail: null,
+        jiraToken: null,
+        jiraProxyUrl: null,
         viewer: null,
         organization: null,
         users: [],
@@ -34,7 +40,7 @@ const LinearPro = {
     },
 
     // ========== API LAYER ==========
-    api: {
+    linearApi: {
         async query(graphql, variables = {}) {
             const res = await fetch('https://api.linear.app/graphql', {
                 method: 'POST',
@@ -206,6 +212,367 @@ const LinearPro = {
             `);
             LinearPro.state.workflowStates = data.workflowStates.nodes;
             return data.workflowStates.nodes;
+        }
+    },
+
+    // ========== JIRA HELPERS ==========
+    mapJiraPriority(priorityName) {
+        const map = { 'Highest': 1, 'High': 2, 'Medium': 3, 'Low': 4, 'Lowest': 4 };
+        return map[priorityName] || 0;
+    },
+
+    mapJiraPriorityLabel(priorityName) {
+        const map = { 'Highest': 'Urgent', 'High': 'High', 'Medium': 'Medium', 'Low': 'Low', 'Lowest': 'Low' };
+        return map[priorityName] || 'No Priority';
+    },
+
+    mapStatusCategory(categoryKey) {
+        const map = { 'new': 'unstarted', 'indeterminate': 'started', 'done': 'completed', 'undefined': 'triage' };
+        return map[categoryKey] || 'triage';
+    },
+
+    mapStatusCategoryColor(categoryKey) {
+        const map = { 'new': '#6e7681', 'indeterminate': '#d29922', 'done': '#3fb950', 'undefined': '#8b949e' };
+        return map[categoryKey] || '#8b949e';
+    },
+
+    extractTextFromADF(node) {
+        if (!node) return '';
+        if (typeof node === 'string') return node;
+        if (node.type === 'text') return node.text || '';
+        if (node.content && Array.isArray(node.content)) {
+            return node.content.map(c => this.extractTextFromADF(c)).join('');
+        }
+        return '';
+    },
+
+    // ========== JIRA API ==========
+    jiraApi: {
+        async request(endpoint, options = {}) {
+            const state = LinearPro.state;
+            const baseUrl = state.jiraProxyUrl
+                ? `${state.jiraProxyUrl.replace(/\/+$/, '')}/https://${state.jiraDomain}`
+                : `https://${state.jiraDomain}`;
+            const url = `${baseUrl}${endpoint}`;
+            const auth = btoa(`${state.jiraEmail}:${state.jiraToken}`);
+
+            let res;
+            try {
+                res = await fetch(url, {
+                    method: options.method || 'GET',
+                    headers: {
+                        'Authorization': `Basic ${auth}`,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        ...(options.headers || {})
+                    },
+                    body: options.body ? JSON.stringify(options.body) : undefined
+                });
+            } catch (networkErr) {
+                if (!state.jiraProxyUrl) {
+                    throw new Error('Cannot reach JIRA — browsers block direct requests (CORS). Open "Advanced — CORS Proxy" and provide a proxy URL (e.g. run npx cors-anywhere on localhost:8080).');
+                }
+                throw new Error(`Network error: ${networkErr.message}. Check that your CORS proxy at ${state.jiraProxyUrl} is running.`);
+            }
+
+            if (!res.ok) {
+                const text = await res.text().catch(() => '');
+                throw new Error(`JIRA API error: ${res.status} ${res.statusText}${text ? ' — ' + text.substring(0, 200) : ''}`);
+            }
+
+            return res.json();
+        },
+
+        async testConnection() {
+            const [myself, serverInfo] = await Promise.all([
+                this.request('/rest/api/3/myself'),
+                this.request('/rest/api/3/serverInfo')
+            ]);
+
+            LinearPro.state.viewer = {
+                id: myself.accountId,
+                name: myself.displayName,
+                email: myself.emailAddress || ''
+            };
+            LinearPro.state.organization = {
+                id: serverInfo.baseUrl || LinearPro.state.jiraDomain,
+                name: serverInfo.serverTitle || LinearPro.state.jiraDomain
+            };
+            return { viewer: LinearPro.state.viewer, organization: LinearPro.state.organization };
+        },
+
+        async getUsers() {
+            let allUsers = [];
+            let startAt = 0;
+            let hasMore = true;
+
+            while (hasMore) {
+                const data = await this.request(`/rest/api/3/users/search?startAt=${startAt}&maxResults=100`);
+                const batch = data.filter(u => u.active && u.accountType === 'atlassian');
+                allUsers = allUsers.concat(batch.map(u => ({
+                    id: u.accountId,
+                    name: u.displayName,
+                    displayName: u.displayName,
+                    email: u.emailAddress || '',
+                    avatarUrl: u.avatarUrls?.['48x48'] || u.avatarUrls?.['32x32'] || null,
+                    active: true,
+                    admin: false
+                })));
+
+                if (data.length < 100) {
+                    hasMore = false;
+                } else {
+                    startAt += 100;
+                }
+            }
+
+            LinearPro.state.users = allUsers;
+            return allUsers;
+        },
+
+        async getIssues() {
+            let allIssues = [];
+            let startAt = 0;
+            let hasMore = true;
+            const domain = LinearPro.state.jiraDomain;
+
+            while (hasMore) {
+                const data = await this.request('/rest/api/3/search', {
+                    method: 'POST',
+                    body: {
+                        jql: 'ORDER BY updated DESC',
+                        startAt,
+                        maxResults: 100,
+                        fields: [
+                            'summary', 'status', 'priority', 'assignee',
+                            'project', 'created', 'updated', 'resolutiondate',
+                            'issuetype', 'labels'
+                        ]
+                    }
+                });
+
+                const normalized = (data.issues || []).map(issue => {
+                    const fields = issue.fields;
+                    const statusCatKey = fields.status?.statusCategory?.key || 'undefined';
+                    const stateType = LinearPro.mapStatusCategory(statusCatKey);
+                    const priorityName = fields.priority?.name || '';
+
+                    return {
+                        id: issue.id,
+                        identifier: issue.key,
+                        title: fields.summary || '',
+                        priority: LinearPro.mapJiraPriority(priorityName),
+                        priorityLabel: LinearPro.mapJiraPriorityLabel(priorityName),
+                        assignee: fields.assignee ? {
+                            id: fields.assignee.accountId,
+                            name: fields.assignee.displayName
+                        } : null,
+                        state: {
+                            id: fields.status?.id || '',
+                            name: fields.status?.name || 'Unknown',
+                            color: LinearPro.mapStatusCategoryColor(statusCatKey),
+                            type: stateType
+                        },
+                        team: fields.project ? {
+                            id: fields.project.id,
+                            name: fields.project.name,
+                            key: fields.project.key
+                        } : null,
+                        createdAt: fields.created,
+                        updatedAt: fields.updated,
+                        completedAt: stateType === 'completed' ? (fields.resolutiondate || fields.updated) : null,
+                        startedAt: stateType === 'started' ? fields.updated : null,
+                        canceledAt: null,
+                        url: `https://${domain}/browse/${issue.key}`
+                    };
+                });
+
+                allIssues = allIssues.concat(normalized);
+                LinearPro.ui.updateLoadingText(`Fetching issues... (${allIssues.length})`);
+
+                if (startAt + data.issues.length >= data.total) {
+                    hasMore = false;
+                } else {
+                    startAt += 100;
+                }
+            }
+
+            LinearPro.state.issues = allIssues;
+            return allIssues;
+        },
+
+        async getTeams() {
+            const data = await this.request('/rest/api/3/project/search?maxResults=100');
+            const teams = (data.values || []).map(p => ({
+                id: p.id,
+                name: p.name,
+                key: p.key
+            }));
+            LinearPro.state.teams = teams;
+            return teams;
+        },
+
+        async getWorkflowStates() {
+            const data = await this.request('/rest/api/3/status');
+            const states = (Array.isArray(data) ? data : []).map(s => {
+                const catKey = s.statusCategory?.key || 'undefined';
+                return {
+                    id: s.id,
+                    name: s.name,
+                    color: LinearPro.mapStatusCategoryColor(catKey),
+                    type: LinearPro.mapStatusCategory(catKey),
+                    position: 0,
+                    team: null
+                };
+            });
+            LinearPro.state.workflowStates = states;
+            return states;
+        },
+
+        async getIssueDetail(issueId) {
+            const domain = LinearPro.state.jiraDomain;
+            const data = await this.request(`/rest/api/3/issue/${issueId}?expand=changelog&fields=summary,description,status,priority,assignee,project,created,updated,resolutiondate,comment,labels,issuetype,parent,subtasks`);
+            const fields = data.fields;
+            const statusCatKey = fields.status?.statusCategory?.key || 'undefined';
+            const stateType = LinearPro.mapStatusCategory(statusCatKey);
+            const priorityName = fields.priority?.name || '';
+
+            // Extract comments
+            const comments = (fields.comment?.comments || []).map(c => ({
+                id: c.id,
+                body: LinearPro.extractTextFromADF(c.body),
+                createdAt: c.created,
+                user: c.author ? {
+                    id: c.author.accountId,
+                    name: c.author.displayName,
+                    displayName: c.author.displayName,
+                    avatarUrl: c.author.avatarUrls?.['48x48'] || null
+                } : null
+            }));
+
+            // Extract history (status changes from changelog)
+            const historyNodes = [];
+            if (data.changelog?.histories) {
+                data.changelog.histories.forEach(h => {
+                    (h.items || []).forEach(item => {
+                        if (item.field === 'status') {
+                            historyNodes.push({
+                                id: h.id,
+                                createdAt: h.created,
+                                fromState: { name: item.fromString || '—', color: '#6e7681' },
+                                toState: { name: item.toString || '—', color: '#6e7681' },
+                                actor: h.author ? { name: h.author.displayName } : { name: 'System' }
+                            });
+                        }
+                    });
+                });
+            }
+
+            // Sub-issues (subtasks)
+            const children = (fields.subtasks || []).map(sub => ({
+                id: sub.id,
+                identifier: sub.key,
+                title: sub.fields?.summary || '',
+                state: {
+                    name: sub.fields?.status?.name || 'Unknown',
+                    color: LinearPro.mapStatusCategoryColor(sub.fields?.status?.statusCategory?.key || 'undefined'),
+                    type: LinearPro.mapStatusCategory(sub.fields?.status?.statusCategory?.key || 'undefined')
+                }
+            }));
+
+            return {
+                id: data.id,
+                identifier: data.key,
+                title: fields.summary || '',
+                description: LinearPro.extractTextFromADF(fields.description),
+                priority: LinearPro.mapJiraPriority(priorityName),
+                priorityLabel: LinearPro.mapJiraPriorityLabel(priorityName),
+                estimate: null,
+                url: `https://${domain}/browse/${data.key}`,
+                assignee: fields.assignee ? {
+                    id: fields.assignee.accountId,
+                    name: fields.assignee.displayName,
+                    displayName: fields.assignee.displayName,
+                    email: fields.assignee.emailAddress || '',
+                    avatarUrl: fields.assignee.avatarUrls?.['48x48'] || null
+                } : null,
+                state: {
+                    id: fields.status?.id || '',
+                    name: fields.status?.name || 'Unknown',
+                    color: LinearPro.mapStatusCategoryColor(statusCatKey),
+                    type: stateType
+                },
+                team: fields.project ? {
+                    id: fields.project.id,
+                    name: fields.project.name,
+                    key: fields.project.key
+                } : null,
+                labels: {
+                    nodes: (fields.labels || []).map(l => ({
+                        id: l,
+                        name: l,
+                        color: '#5E6AD2'
+                    }))
+                },
+                comments: { nodes: comments },
+                history: { nodes: historyNodes },
+                createdAt: fields.created,
+                updatedAt: fields.updated,
+                completedAt: stateType === 'completed' ? (fields.resolutiondate || fields.updated) : null,
+                startedAt: stateType === 'started' ? fields.updated : null,
+                cycle: null,
+                project: null,
+                parent: fields.parent ? {
+                    id: fields.parent.id,
+                    identifier: fields.parent.key,
+                    title: fields.parent.fields?.summary || ''
+                } : null,
+                children: { nodes: children }
+            };
+        },
+
+        async getUserActivity(userId) {
+            // For JIRA MVP, return empty array — activity degrades gracefully
+            return [];
+        }
+    },
+
+    // ========== API DISPATCHER ==========
+    api: {
+        testConnection() {
+            return LinearPro.state.provider === 'jira'
+                ? LinearPro.jiraApi.testConnection()
+                : LinearPro.linearApi.testConnection();
+        },
+        getUsers() {
+            return LinearPro.state.provider === 'jira'
+                ? LinearPro.jiraApi.getUsers()
+                : LinearPro.linearApi.getUsers();
+        },
+        getIssues() {
+            return LinearPro.state.provider === 'jira'
+                ? LinearPro.jiraApi.getIssues()
+                : LinearPro.linearApi.getIssues();
+        },
+        getTeams() {
+            return LinearPro.state.provider === 'jira'
+                ? LinearPro.jiraApi.getTeams()
+                : LinearPro.linearApi.getTeams();
+        },
+        getWorkflowStates() {
+            return LinearPro.state.provider === 'jira'
+                ? LinearPro.jiraApi.getWorkflowStates()
+                : LinearPro.linearApi.getWorkflowStates();
+        },
+        getIssueDetail(issueId) {
+            return LinearPro.state.provider === 'jira'
+                ? LinearPro.jiraApi.getIssueDetail(issueId)
+                : LinearPro.linearApi.getIssueDetail(issueId);
+        },
+        getUserActivity(userId) {
+            return LinearPro.state.provider === 'jira'
+                ? LinearPro.jiraApi.getUserActivity(userId)
+                : LinearPro.linearApi.getUserActivity(userId);
         }
     },
 
@@ -2154,38 +2521,119 @@ const LinearPro = {
             }
         });
 
+        // Toggle JIRA token visibility
+        document.getElementById('toggle-jira-visibility').addEventListener('click', () => {
+            const input = document.getElementById('jira-token-input');
+            const icon = document.querySelector('#toggle-jira-visibility i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.className = 'fas fa-eye-slash';
+            } else {
+                input.type = 'password';
+                icon.className = 'fas fa-eye';
+            }
+        });
+
+        // Provider toggle tabs
+        document.querySelectorAll('.provider-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.provider-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                const provider = tab.dataset.provider;
+                this.state.provider = provider;
+
+                const linearFields = document.getElementById('linear-fields');
+                const jiraFields = document.getElementById('jira-fields');
+                const btnText = document.querySelector('#connect-btn .btn-text');
+                const hint = document.getElementById('api-hint');
+
+                if (provider === 'jira') {
+                    linearFields.classList.add('hidden');
+                    jiraFields.classList.remove('hidden');
+                    btnText.textContent = 'Connect to JIRA';
+                    hint.innerHTML = '<i class="fas fa-info-circle"></i> Create an API token at <strong>id.atlassian.com → Security → API tokens</strong>';
+                } else {
+                    jiraFields.classList.add('hidden');
+                    linearFields.classList.remove('hidden');
+                    btnText.textContent = 'Connect to Linear';
+                    hint.innerHTML = '<i class="fas fa-info-circle"></i> Find your API key in <strong>Linear → Settings → API → Personal API keys</strong>';
+                }
+
+                this.ui.hideLoginError();
+            });
+        });
+
         // Connect button
         document.getElementById('connect-btn').addEventListener('click', async () => {
             const btn = document.getElementById('connect-btn');
-            const input = document.getElementById('api-key-input');
-            const key = input.value.trim();
-
-            if (!key) {
-                this.ui.showLoginError('Please enter your Linear API key.');
-                return;
-            }
-
             btn.classList.add('loading');
             this.ui.hideLoginError();
 
             try {
-                this.state.apiKey = key;
-                await this.api.testConnection();
-                localStorage.setItem('linearApiKey', key);
-                await this.loadAllData();
+                if (this.state.provider === 'jira') {
+                    const domain = document.getElementById('jira-domain-input').value.trim();
+                    const email = document.getElementById('jira-email-input').value.trim();
+                    const token = document.getElementById('jira-token-input').value.trim();
+                    const proxy = document.getElementById('jira-proxy-input').value.trim();
+
+                    if (!domain || !email || !token) {
+                        this.ui.showLoginError('Please fill in all JIRA fields (domain, email, API token).');
+                        btn.classList.remove('loading');
+                        return;
+                    }
+
+                    this.state.jiraDomain = domain;
+                    this.state.jiraEmail = email;
+                    this.state.jiraToken = token;
+                    this.state.jiraProxyUrl = proxy || null;
+
+                    await this.api.testConnection();
+
+                    localStorage.setItem('linearProProvider', 'jira');
+                    localStorage.setItem('jiraDomain', domain);
+                    localStorage.setItem('jiraEmail', email);
+                    localStorage.setItem('jiraToken', token);
+                    if (proxy) localStorage.setItem('jiraProxyUrl', proxy);
+
+                    await this.loadAllData();
+                } else {
+                    const key = document.getElementById('api-key-input').value.trim();
+                    if (!key) {
+                        this.ui.showLoginError('Please enter your Linear API key.');
+                        btn.classList.remove('loading');
+                        return;
+                    }
+
+                    this.state.apiKey = key;
+                    await this.api.testConnection();
+
+                    localStorage.setItem('linearProProvider', 'linear');
+                    localStorage.setItem('linearApiKey', key);
+
+                    await this.loadAllData();
+                }
             } catch (err) {
-                this.state.apiKey = null;
+                if (this.state.provider === 'jira') {
+                    this.state.jiraDomain = null;
+                    this.state.jiraEmail = null;
+                    this.state.jiraToken = null;
+                    this.state.jiraProxyUrl = null;
+                } else {
+                    this.state.apiKey = null;
+                }
                 this.ui.showLoginError(`Connection failed: ${err.message}`);
             } finally {
                 btn.classList.remove('loading');
             }
         });
 
-        // Enter key on input
+        // Enter key on input (both Linear and JIRA fields)
         document.getElementById('api-key-input').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                document.getElementById('connect-btn').click();
-            }
+            if (e.key === 'Enter') document.getElementById('connect-btn').click();
+        });
+        document.getElementById('jira-token-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('connect-btn').click();
         });
 
         // Refresh
@@ -2198,14 +2646,41 @@ const LinearPro = {
 
         // Disconnect
         document.getElementById('disconnect-btn').addEventListener('click', () => {
+            // Clear all provider keys
+            localStorage.removeItem('linearProProvider');
             localStorage.removeItem('linearApiKey');
+            localStorage.removeItem('jiraDomain');
+            localStorage.removeItem('jiraEmail');
+            localStorage.removeItem('jiraToken');
+            localStorage.removeItem('jiraProxyUrl');
+
+            const wasProvider = this.state.provider;
             this.state.apiKey = null;
+            this.state.jiraDomain = null;
+            this.state.jiraEmail = null;
+            this.state.jiraToken = null;
+            this.state.jiraProxyUrl = null;
+            this.state.provider = 'linear';
             this.state.users = [];
             this.state.issues = [];
             this.state.memberData = [];
+
             document.getElementById('api-key-input').value = '';
+            document.getElementById('jira-domain-input').value = '';
+            document.getElementById('jira-email-input').value = '';
+            document.getElementById('jira-token-input').value = '';
+            document.getElementById('jira-proxy-input').value = '';
+
+            // Reset provider toggle to Linear
+            document.querySelectorAll('.provider-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.provider-tab[data-provider="linear"]').classList.add('active');
+            document.getElementById('linear-fields').classList.remove('hidden');
+            document.getElementById('jira-fields').classList.add('hidden');
+            document.querySelector('#connect-btn .btn-text').textContent = 'Connect to Linear';
+            document.getElementById('api-hint').innerHTML = '<i class="fas fa-info-circle"></i> Find your API key in <strong>Linear → Settings → API → Personal API keys</strong>';
+
             this.ui.showView('login-view');
-            this.ui.toast('Disconnected from Linear', 'info');
+            this.ui.toast(`Disconnected from ${wasProvider === 'jira' ? 'JIRA' : 'Linear'}`, 'info');
         });
 
         // Modal close button
@@ -2286,20 +2761,65 @@ const LinearPro = {
         this.initParticles();
         this.bindEvents();
 
-        // Check for saved API key
-        const savedKey = localStorage.getItem('linearApiKey');
-        if (savedKey) {
-            this.state.apiKey = savedKey;
-            document.getElementById('api-key-input').value = savedKey;
-            // Auto-connect
-            this.api.testConnection()
-                .then(() => this.loadAllData())
-                .catch(() => {
-                    localStorage.removeItem('linearApiKey');
-                    this.ui.showView('login-view');
-                });
+        // Check for saved provider
+        const savedProvider = localStorage.getItem('linearProProvider');
+
+        if (savedProvider === 'jira') {
+            const domain = localStorage.getItem('jiraDomain');
+            const email = localStorage.getItem('jiraEmail');
+            const token = localStorage.getItem('jiraToken');
+            const proxy = localStorage.getItem('jiraProxyUrl');
+
+            if (domain && email && token) {
+                this.state.provider = 'jira';
+                this.state.jiraDomain = domain;
+                this.state.jiraEmail = email;
+                this.state.jiraToken = token;
+                this.state.jiraProxyUrl = proxy || null;
+
+                // Set JIRA tab active
+                document.querySelectorAll('.provider-tab').forEach(t => t.classList.remove('active'));
+                document.querySelector('.provider-tab[data-provider="jira"]').classList.add('active');
+                document.getElementById('linear-fields').classList.add('hidden');
+                document.getElementById('jira-fields').classList.remove('hidden');
+                document.getElementById('jira-domain-input').value = domain;
+                document.getElementById('jira-email-input').value = email;
+                document.getElementById('jira-token-input').value = token;
+                if (proxy) document.getElementById('jira-proxy-input').value = proxy;
+                document.querySelector('#connect-btn .btn-text').textContent = 'Connect to JIRA';
+
+                // Auto-connect
+                this.api.testConnection()
+                    .then(() => this.loadAllData())
+                    .catch(() => {
+                        localStorage.removeItem('linearProProvider');
+                        localStorage.removeItem('jiraDomain');
+                        localStorage.removeItem('jiraEmail');
+                        localStorage.removeItem('jiraToken');
+                        localStorage.removeItem('jiraProxyUrl');
+                        this.ui.showView('login-view');
+                    });
+            } else {
+                this.ui.showView('login-view');
+            }
         } else {
-            this.ui.showView('login-view');
+            // Linear (default)
+            const savedKey = localStorage.getItem('linearApiKey');
+            if (savedKey) {
+                this.state.provider = 'linear';
+                this.state.apiKey = savedKey;
+                document.getElementById('api-key-input').value = savedKey;
+                // Auto-connect
+                this.api.testConnection()
+                    .then(() => this.loadAllData())
+                    .catch(() => {
+                        localStorage.removeItem('linearApiKey');
+                        localStorage.removeItem('linearProProvider');
+                        this.ui.showView('login-view');
+                    });
+            } else {
+                this.ui.showView('login-view');
+            }
         }
     }
 };

@@ -25,23 +25,103 @@
                 <p class="tagline">Team Analytics Dashboard</p>
             </div>
 
+            <!-- Provider Toggle -->
+            <div class="provider-toggle">
+                <button class="provider-tab active" data-provider="linear">
+                    <i class="fas fa-chart-line"></i> Linear
+                </button>
+                <button class="provider-tab" data-provider="jira">
+                    <i class="fab fa-jira"></i> JIRA
+                </button>
+            </div>
+
             <div class="login-form">
-                <div class="input-group">
-                    <label for="api-key-input">
-                        <i class="fas fa-key"></i> Linear API Key
-                    </label>
-                    <div class="input-wrapper">
-                        <input
-                            type="password"
-                            id="api-key-input"
-                            placeholder="lin_api_xxxxxxxxxxxxxxxxxx"
-                            autocomplete="off"
-                            spellcheck="false"
-                        >
-                        <button id="toggle-visibility" class="icon-btn" title="Toggle visibility">
-                            <i class="fas fa-eye"></i>
-                        </button>
+                <!-- Linear Fields -->
+                <div id="linear-fields">
+                    <div class="input-group">
+                        <label for="api-key-input">
+                            <i class="fas fa-key"></i> Linear API Key
+                        </label>
+                        <div class="input-wrapper">
+                            <input
+                                type="password"
+                                id="api-key-input"
+                                placeholder="lin_api_xxxxxxxxxxxxxxxxxx"
+                                autocomplete="off"
+                                spellcheck="false"
+                            >
+                            <button id="toggle-visibility" class="icon-btn" title="Toggle visibility">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
+                </div>
+
+                <!-- JIRA Fields -->
+                <div id="jira-fields" class="hidden">
+                    <div class="input-group">
+                        <label for="jira-domain-input">
+                            <i class="fas fa-globe"></i> JIRA Domain
+                        </label>
+                        <div class="input-wrapper">
+                            <input
+                                type="text"
+                                id="jira-domain-input"
+                                placeholder="your-company.atlassian.net"
+                                autocomplete="off"
+                                spellcheck="false"
+                            >
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="jira-email-input">
+                            <i class="fas fa-envelope"></i> Email
+                        </label>
+                        <div class="input-wrapper">
+                            <input
+                                type="email"
+                                id="jira-email-input"
+                                placeholder="you@company.com"
+                                autocomplete="off"
+                                spellcheck="false"
+                            >
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="jira-token-input">
+                            <i class="fas fa-key"></i> API Token
+                        </label>
+                        <div class="input-wrapper">
+                            <input
+                                type="password"
+                                id="jira-token-input"
+                                placeholder="Your Atlassian API token"
+                                autocomplete="off"
+                                spellcheck="false"
+                            >
+                            <button id="toggle-jira-visibility" class="icon-btn" title="Toggle visibility">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Optional Proxy URL (Advanced) -->
+                    <details class="proxy-details">
+                        <summary><i class="fas fa-cog"></i> Advanced — CORS Proxy</summary>
+                        <div class="input-group" style="margin-top: 0.75rem">
+                            <label for="jira-proxy-input">
+                                <i class="fas fa-server"></i> Proxy URL (optional)
+                            </label>
+                            <div class="input-wrapper">
+                                <input
+                                    type="text"
+                                    id="jira-proxy-input"
+                                    placeholder="http://localhost:8080"
+                                    autocomplete="off"
+                                    spellcheck="false"
+                                >
+                            </div>
+                        </div>
+                    </details>
                 </div>
 
                 <button id="connect-btn" class="btn-primary">
@@ -52,7 +132,7 @@
 
                 <div id="login-error" class="error-msg hidden"></div>
 
-                <div class="api-hint">
+                <div id="api-hint" class="api-hint">
                     <i class="fas fa-info-circle"></i>
                     Find your API key in <strong>Linear → Settings → API → Personal API keys</strong>
                 </div>
