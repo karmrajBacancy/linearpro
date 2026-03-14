@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinearPro — Team Analytics Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ========== Animated Background Particles ========== -->
+    <canvas id="particles-canvas"></canvas>
+
+    <!-- ========== LOGIN VIEW ========== -->
+    <div id="login-view" class="view active">
+        <div class="login-card">
+            <div class="login-logo">
+                <div class="logo-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h1>Linear<span>Pro</span></h1>
+                <p class="tagline">Team Analytics Dashboard</p>
+            </div>
+
+            <!-- Provider Toggle -->
+            <div class="provider-toggle">
+                <button class="provider-tab active" data-provider="linear">
+                    <i class="fas fa-chart-line"></i> Linear
+                </button>
+                <button class="provider-tab" data-provider="jira">
+                    <i class="fab fa-jira"></i> JIRA
+                </button>
+            </div>
+
+            <div class="login-form">
+                <!-- Linear Fields -->
+                <div id="linear-fields">
+                    <div class="input-group">
+                        <label for="api-key-input">
+                            <i class="fas fa-key"></i> Linear API Key
+                        </label>
+                        <div class="input-wrapper">
+                            <input
+                                type="password"
+                                id="api-key-input"
+                                placeholder="lin_api_xxxxxxxxxxxxxxxxxx"
+                                autocomplete="off"
+                                spellcheck="false"
+                            >
+                            <button id="toggle-visibility" class="icon-btn" title="Toggle visibility">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- JIRA Fields -->
+                <div id="jira-fields" class="hidden">
+                    <div class="input-group">
+                        <label for="jira-domain-input">
+                            <i class="fas fa-globe"></i> JIRA Domain
+                        </label>
+                        <div class="input-wrapper">
+                            <input
+                                type="text"
+                                id="jira-domain-input"
+                                placeholder="your-company.atlassian.net"
+                                autocomplete="off"
+                                spellcheck="false"
+                            >
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="jira-email-input">
+                            <i class="fas fa-envelope"></i> Email
+                        </label>
+                        <div class="input-wrapper">
+                            <input
+                                type="email"
+                                id="jira-email-input"
+                                placeholder="you@company.com"
+                                autocomplete="off"
+                                spellcheck="false"
+                            >
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="jira-token-input">
+                            <i class="fas fa-key"></i> API Token
+                        </label>
+                        <div class="input-wrapper">
+                            <input
+                                type="password"
+                                id="jira-token-input"
+                                placeholder="Your Atlassian API token"
+                                autocomplete="off"
+                                spellcheck="false"
+                            >
+                            <button id="toggle-jira-visibility" class="icon-btn" title="Toggle visibility">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Optional Proxy URL (Advanced) -->
+                    <details class="proxy-details">
+                        <summary><i class="fas fa-cog"></i> Advanced — CORS Proxy</summary>
+                        <div class="input-group" style="margin-top: 0.75rem">
+                            <label for="jira-proxy-input">
+                                <i class="fas fa-server"></i> Proxy URL (optional)
+                            </label>
+                            <div class="input-wrapper">
+                                <input
+                                    type="text"
+                                    id="jira-proxy-input"
+                                    placeholder="http://localhost:8080"
+                                    autocomplete="off"
+                                    spellcheck="false"
+                                >
+                            </div>
+                        </div>
+                    </details>
+                </div>
+
+                <button id="connect-btn" class="btn-primary">
+                    <span class="btn-text">Connect to Linear</span>
+                    <span class="btn-loader"><i class="fas fa-circle-notch fa-spin"></i></span>
+                    <i class="fas fa-arrow-right btn-arrow"></i>
+                </button>
+
+                <div id="login-error" class="error-msg hidden"></div>
+
+                <div id="api-hint" class="api-hint">
+                    <i class="fas fa-info-circle"></i>
+                    Find your API key in <strong>Linear → Settings → API → Personal API keys</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== DASHBOARD VIEW ========== -->
+    <div id="dashboard-view" class="view">
+        <!-- Top Nav -->
+        <nav class="top-nav">
+            <div class="nav-left">
+                <div class="nav-logo">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Linear<strong>Pro</strong></span>
+                </div>
+                <div id="org-name" class="org-badge"></div>
+            </div>
+            <div class="nav-right">
+                <button id="standup-btn" class="standup-nav-btn" title="Daily Standup Brief">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Standup</span>
+                </button>
+                <button id="sos-btn" class="sos-nav-btn" title="SOS — Critical Stale Tickets">
+                    <i class="fas fa-triangle-exclamation"></i>
+                    <span>SOS</span>
+                    <span id="sos-count-badge" class="sos-count-badge" style="display:none">0</span>
+                </button>
+                <button id="refresh-btn" class="btn-icon" title="Refresh data">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button id="disconnect-btn" class="btn-icon btn-danger" title="Disconnect">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Stats Summary -->
+        <section class="stats-row">
+            <div class="stat-card" data-stat="members">
+                <div class="stat-icon"><i class="fas fa-users"></i></div>
+                <div class="stat-info">
+                    <div class="stat-value" id="stat-members">0</div>
+                    <div class="stat-label">Team Members</div>
+                </div>
+            </div>
+            <div class="stat-card" data-stat="issues">
+                <div class="stat-icon"><i class="fas fa-tasks"></i></div>
+                <div class="stat-info">
+                    <div class="stat-value" id="stat-issues">0</div>
+                    <div class="stat-label">Total Issues</div>
+                </div>
+            </div>
+            <div class="stat-card" data-stat="completed">
+                <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-info">
+                    <div class="stat-value" id="stat-completed">0</div>
+                    <div class="stat-label">Completed</div>
+                </div>
+            </div>
+            <div class="stat-card" data-stat="in-progress">
+                <div class="stat-icon"><i class="fas fa-spinner"></i></div>
+                <div class="stat-info">
+                    <div class="stat-value" id="stat-in-progress">0</div>
+                    <div class="stat-label">In Progress</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Team Members Grid -->
+        <section class="section">
+            <div class="section-header">
+                <h2><i class="fas fa-user-group"></i> Team Members</h2>
+                <div class="sort-controls">
+                    <button class="sort-btn active" data-sort="issues">By Issues</button>
+                    <button class="sort-btn" data-sort="name">By Name</button>
+                </div>
+            </div>
+            <div id="members-grid" class="members-grid">
+                <!-- Cards injected by JS -->
+            </div>
+        </section>
+
+        <!-- Analytics Charts -->
+        <section class="section charts-section">
+            <div class="section-header">
+                <h2><i class="fas fa-chart-pie"></i> Analytics</h2>
+            </div>
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>Issue Status Distribution</h3>
+                    <div class="chart-container">
+                        <canvas id="chart-status"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Team Workload</h3>
+                    <div class="chart-container chart-container-wide">
+                        <canvas id="chart-workload"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Priority Breakdown</h3>
+                    <div class="chart-container">
+                        <canvas id="chart-priority"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>Issues by Team</h3>
+                    <div class="chart-container">
+                        <canvas id="chart-teams"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="loading-overlay hidden">
+            <div class="loader">
+                <div class="loader-spinner"></div>
+                <p id="loading-text">Fetching your data...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== SOS PANEL ========== -->
+    <div id="sos-panel" class="sos-panel">
+        <div class="sos-panel-backdrop"></div>
+        <div class="sos-panel-container">
+            <button id="sos-panel-close" class="sos-panel-close">
+                <i class="fas fa-times"></i>
+            </button>
+            <div id="sos-panel-content" class="sos-panel-content">
+                <!-- Injected by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== STANDUP PANEL ========== -->
+    <div id="standup-panel" class="standup-panel">
+        <div class="standup-panel-backdrop"></div>
+        <div class="standup-panel-container">
+            <button id="standup-panel-close" class="standup-panel-close">
+                <i class="fas fa-times"></i>
+            </button>
+            <div id="standup-panel-content" class="standup-panel-content">
+                <!-- Injected by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== MEMBER DETAIL MODAL ========== -->
+    <div id="member-modal" class="member-modal">
+        <div class="modal-backdrop"></div>
+        <div class="modal-container">
+            <button id="modal-close" class="modal-close">
+                <i class="fas fa-times"></i>
+            </button>
+            <div id="modal-content" class="modal-content"></div>
+        </div>
+    </div>
+
+    <!-- ========== TICKET DETAIL PANEL ========== -->
+    <div id="ticket-panel" class="ticket-panel">
+        <div class="ticket-panel-backdrop"></div>
+        <div class="ticket-panel-container">
+            <button id="ticket-panel-close" class="ticket-panel-close">
+                <i class="fas fa-arrow-right"></i>
+            </button>
+            <div id="ticket-panel-content" class="ticket-panel-content">
+                <!-- Injected by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
